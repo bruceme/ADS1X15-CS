@@ -19,12 +19,16 @@ Copy / Paste this code into any .Net (4.x, Core, Std) and compile
 ```
 var adcDevice = new ADS1025();
 
-var singleValue = adcDevice.ReadChannel(0);
+// Single absolute value
+Console.WriteLine($"Single - {adcDevice.ReadChannel(0)});
 
-var deltaValue = adcDevice.ReadDifferential_2_3(0);
+// Differential 2 & 3
+Console.WriteLine($"Differntial 2 & 3 - {adcDevice.ReadDifferential_2_3()});
 
-adcDevice.StartComparitor(1);
+// Begin the comparitor, with 200 as the threashold
+adcDevice.StartComparitor(1, 200);
 
+// Poll the comparitor to read the values above the set threashold
 for(int i = 0; i < 10; i++)
-  Console.WriteLine($"Polling - {adcDevice.PollReadComparitorSigned()}");
+  Console.WriteLine($"Polling 1 - {adcDevice.PollReadComparitorSigned()}");
 ```
