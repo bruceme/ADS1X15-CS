@@ -5,7 +5,7 @@ using System.Threading;
 using Unosquare.RaspberryIO;
 using Unosquare.RaspberryIO.Abstractions;
 
-namespace MotorTester
+namespace ADS1x15
 {
     /// <summary>
     /// Abstract base class for both ADC varients, new the specific varient to ensure it's configured correctly at construction
@@ -32,9 +32,10 @@ namespace MotorTester
 
         public adsGain_t Gain { get; set; }
 
-        public ADS1x15(byte address = ADS1x15_ADDRESS)
+        protected ADS1x15(byte address = ADS1x15_ADDRESS)
         {
             device = Pi.I2C.AddDevice(i2cAddress = address);
+
             Gain = adsGain_t.GAIN_TWOTHIRDS; /* +/- 6.144V range (limited to VDD +0.3V max!) */
         }
 
@@ -77,10 +78,10 @@ namespace MotorTester
 
             // Set the high threshold register
             // Shift 12-bit results left 4 bits for the ADS1015
-            writeRegister(i2cAddress, ADS1015_REG_POINTER_HITHRESH, threshold << bitShift);
+            writeRegister(ADS1015_REG_POINTER_HITHRESH, threshold << bitShift);
 
             // Write config register to the ADC
-            writeRegister(i2cAddress, ADS1015_REG_POINTER_CONFIG, config);
+            writeRegister(ADS1015_REG_POINTER_CONFIG, config);
         }
 
         public short PollComparitorResult()
@@ -194,21 +195,28 @@ namespace MotorTester
                                         | ADS1015_REG_CONFIG_MODE_CONTIN   // Continuous conversion mode
                                         ;
 
-        private void writeRegister(byte i2cAddress, byte reg, int value)
+        private void writeRegister(byte reg, int value)
         {
-            // Wire.beginTransmission(i2cAddress);
-            device.Write(reg);
-            device.Write((byte)(value >> 8));
-            device.Write((byte)(value & 0xFF));
-            // Wire.endTransmission();
+            int result = -1;
+
+            // You can't use "device.WriteAddressWord" fails with an exception, this needs a retry cause it's flaky
+            for (int i = 10; i >= 0 &&
+                (result = Unosquare.WiringPi.Native.WiringPi.WiringPiI2CWriteReg16(device.FileDescriptor, reg, value)) < 0;
+                i--)
+                Thread.Sleep(10);
         }
 
-        private ushort readRegister(byte i2cAddress, byte reg)
+        private ushort readRegister(byte reg)
         {
-            //Wire.beginTransmission(i2cAddress);
-            device.Write(ADS1015_REG_POINTER_CONVERT);
-            //Wire.endTransmission();
-            return device.ReadAddressWord(i2cAddress);
+            int result = -1;
+
+            // You can't use "device.WriteAddressWord" fails with an exception, this needs a retry cause it's flaky
+            for (int i = 10; i >= 0 &&
+                (result = Unosquare.WiringPi.Native.WiringPi.WiringPiI2CReadReg16(device.FileDescriptor, reg)) < 0;
+                i--)
+                Thread.Sleep(10);
+
+            return (ushort)result;
         }
 
 
@@ -220,7 +228,7 @@ namespace MotorTester
         private short readADC(int config)
         {
             // Write config register to the ADC
-            writeRegister(i2cAddress, ADS1015_REG_POINTER_CONFIG, ((int)Gain | config));
+            writeRegister(ADS1015_REG_POINTER_CONFIG, ((int)Gain | config));
 
             return ReadADC();
         }
@@ -232,7 +240,7 @@ namespace MotorTester
 
             // Read the conversion results
             // Shift 12-bit results right 4 bits for the ADS1015
-            return (short)(readRegister(i2cAddress, ADS1015_REG_POINTER_CONVERT) >> bitShift);
+            return (short)(readRegister(ADS1015_REG_POINTER_CONVERT) >> bitShift);
         }
 
         /// <summary>
